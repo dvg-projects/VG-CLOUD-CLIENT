@@ -32,7 +32,7 @@ de usuario, se está dotando a dicha UI de una interfaz atractiva, basada en los
 ## Instrucciones para Despliegue Local (PARTE DE CAPA CLIENTE)
 
 Si deseas clonar el proyecto para auditar el código o realizar pruebas en tu propia red local, sigue estos pasos:
-**NOTA** -> Será necesario que incluyas las dependencais necesarias relativas a `flutter_dotenv`.
+**NOTA**: Será necesario que incluyas las dependencias necesarias relativas a `flutter_dotenv`.
 Para más información: https://pub.dev/packages/flutter_dotenv
 
 1. **Clonar el repositorio:**
