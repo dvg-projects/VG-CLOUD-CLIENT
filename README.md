@@ -73,9 +73,11 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 - [x] Arquitectura base de carpetas y desacoplamiento de capas.
 - [x] Implementación de pantalla de Inicio de sesión y su lógica backend correspondiente.
 - [x] Implementación de persistencia al inicio de sesión con `SharedPreferences`
+- [ ] Implementación de descarga de ficheros (siguiente paso lógico una vez lograda la subida de ficheros)
 - [ ] Implementación de mejoras en el registro de usuario, añadiendo criterios para las contraseñas (longitud, carácteres especiales...).
 - [ ] Implementación de sección informativa del estado del Cloud (memoria disponible, total, usada...).
 - [ ] Implementación de sección de perfil de usuario (con ajustes menores).
 - [ ] Implementación de pantalla de registro y su lógica backend correspondiente.
 - [ ] Cobertura de pruebas unitarias para los controladores principales.
+- [ ] Mejoras significativas en las pantallas de visualización de ficheros (Algunas como las pertenecientes a ficheros multimedia son muy básicas aún).
 - [ ] Corrección de posibles errores y mejoras menores tanto en BackEnd como en GUI (front).
