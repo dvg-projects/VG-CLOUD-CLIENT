@@ -32,7 +32,7 @@ de usuario, se está dotando a dicha UI de una interfaz atractiva, basada en los
 ## Instrucciones para Despliegue Local (PARTE DE CAPA CLIENTE)
 
 Si deseas clonar el proyecto para auditar el código o realizar pruebas en tu propia red local, sigue estos pasos:
-**NOTA** -> Será necesario que incluyas las dependencais necesarias relativas a `flutter_dotenv`.
+**NOTA** -> Será necesario que incluyas las dependencias necesarias relativas a `flutter_dotenv`.
 Para más información: https://pub.dev/packages/flutter_dotenv
 
 1. **Clonar el repositorio:**
@@ -73,11 +73,11 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 - [x] Arquitectura base de carpetas y desacoplamiento de capas.
 - [x] Implementación de pantalla de Inicio de sesión y su lógica backend correspondiente.
 - [x] Implementación de persistencia al inicio de sesión con `SharedPreferences`
-- [ ] Implementación de descarga de ficheros (siguiente paso lógico una vez lograda la subida de ficheros)
 - [ ] Implementación de mejoras en el registro de usuario, añadiendo criterios para las contraseñas (longitud, carácteres especiales...).
+- [ ] Implementación de descarga de ficheros (siguiente paso natural habiendo implementado ya la subida de ficheros).
+- [ ] Mejoras significativas en las pantallas de visualizado de ficheros multimedia (actualmente existe una versión muy primitiva).
 - [ ] Implementación de sección informativa del estado del Cloud (memoria disponible, total, usada...).
 - [ ] Implementación de sección de perfil de usuario (con ajustes menores).
 - [ ] Implementación de pantalla de registro y su lógica backend correspondiente.
 - [ ] Cobertura de pruebas unitarias para los controladores principales.
-- [ ] Mejoras significativas en las pantallas de visualización de ficheros (Algunas como las pertenecientes a ficheros multimedia son muy básicas aún).
 - [ ] Corrección de posibles errores y mejoras menores tanto en BackEnd como en GUI (front).
