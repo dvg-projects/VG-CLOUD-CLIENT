@@ -81,3 +81,12 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 - [ ] Implementación de pantalla de registro y su lógica backend correspondiente.
 - [ ] Cobertura de pruebas unitarias para los controladores principales.
 - [ ] Corrección de posibles errores y mejoras menores tanto en BackEnd como en GUI (front).
+
+## :bug: :umbrella: Estado Actual y Bugs Conocidos :tool: :construction_worker:
+
+Actualmente, el módulo de gestión de descargas se encuentra en desarrollo activo. Se han identificado las siguientes limitaciones temporales que están siendo subsanadas:
+
+* **Descarga Recursiva:** Fallo puntual en la resolución de rutas al descargar directorios completos que contienen subcarpetas anidadas.
+* **Rutas de Almacenamiento:** Comportamiento inconsistente en la asignación de rutas locales específicas bajo determinadas condiciones del sistema operativo.
+
+*Nota: La aplicación es completamente estable, compila sin errores y la descarga de archivos individuales funciona al 100%.*
