@@ -82,7 +82,7 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 - [ ] Cobertura de pruebas unitarias para los controladores principales.
 - [ ] Corrección de posibles errores y mejoras menores tanto en BackEnd como en GUI (front).
 
-## :bug: :umbrella: Estado Actual y Bugs Conocidos :tool: :construction_worker:
+## :bug: :umbrella: Estado Actual y Bugs Conocidos :wrench: :construction_worker:
 
 Actualmente, el módulo de gestión de descargas se encuentra en desarrollo activo. Se han identificado las siguientes limitaciones temporales que están siendo subsanadas:
 
