@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart'; // Nuestro envoltorio que decide que arrancar, si el loggeo u esta "actividad".
 
 /**
@@ -104,13 +106,15 @@ class FileListPage extends StatefulWidget {
   _FileListPageState createState() => _FileListPageState();
 }
 
-// El state de la app, que en función de los datos cambiará la UI.
-// SE CONSIDERA LA CLASE PRINCIPAL
+// CLASE QUE CORRESPONDE A PANTALLA PRINCIPAL
 class _FileListPageState extends State<FileListPage> {
   String _user = "";
   List files = []; // Lista de archivos a mostrar.
+  List<String> selectedFiles = []; // Lista de ficheros seleccionados.
   String _currentPath = ""; // Empieza vacío (raíz del usuario)
   List<String> _navigationHistory = []; // Para poder volver atrás
+  bool isDownloading =
+      false; // Para determinar si hay ficheros descargando o no.
 
   // URL de conexión con el servidor.
   final String baseUrl = "${dotenv.env['API_URL']}/archivos";
@@ -187,7 +191,9 @@ class _FileListPageState extends State<FileListPage> {
       String fileName = result.files.first.name;
 
       // RUTA ACTUAL PARA SUBIDA DE ARCHIVOS
-      String destinationPath = _currentPath.isEmpty ? _user : "$_user/$_currentPath";
+      String destinationPath = _currentPath.isEmpty
+          ? _user
+          : "$_user/$_currentPath";
 
       // Dio realiza peticiones POST para conocer el estado de subida del archivo, en base a la URL que comunica
       // con nuestro Servidor.
@@ -229,12 +235,14 @@ class _FileListPageState extends State<FileListPage> {
    * Función destinada a crear directorios.
    */
   void createFolder(String folderName) async {
-
     // RUTA ACTUAL PARA CREACIÓN DE DIRECTORIOS
-    String destinationPath = _currentPath.isEmpty ? _user : "$_user/$_currentPath";
+    String destinationPath = _currentPath.isEmpty
+        ? _user
+        : "$_user/$_currentPath";
 
     // Construimos la URL con el usuario y el nombre de la nueva carpeta
-    final url = '$baseUrl/folder?usuario=$destinationPath&folderName=$folderName';
+    final url =
+        '$baseUrl/folder?usuario=$destinationPath&folderName=$folderName';
 
     try {
       final response = await http.post(Uri.parse(url));
@@ -261,12 +269,50 @@ class _FileListPageState extends State<FileListPage> {
   }
 
   /**
+   * Función encargada de DESCARGAR ARCHIVOS desde nuestro Cloud.
+   */
+  Future<void> downloadFiles(List<String> filesList) async {
+    // Comprobamos que la lista de referencias de ficheros no venga vacía.
+    if (filesList.isEmpty) return;
+
+    // Inicializamos Dio y obtenemos la ruta destino del archivo u archivos a descargar (esto dependerá del sistema
+    // en el que nos encontremos).
+    Dio dio = Dio();
+    var destinationDirectory =
+        await getDownloadsDirectory() ??
+        await getApplicationDocumentsDirectory();
+
+    print("Iniciando proceso para ${filesList.length} archivo(s)...");
+
+    // Mapeamos la lista de archivos a una lista de tareas asíncronas
+    // Dicho de otra manera, dicho de otra manera, itera en la petición
+    // a la función de Springboot que descarga fichero, cuantos archivos haya y los divide en tareas asíncronas.
+    List<Future<void>> taskList = filesList.map((filename) async {
+      try {
+        final String urlIndividual = "$baseUrl/$filename?usuario=$_user";
+        String localSavePath = "${destinationDirectory.path}/$filename";
+
+        // Cada descarga se dispara de forma independiente
+        await dio.download(urlIndividual, localSavePath);
+        print("Descargado: $filename");
+      } catch (e) {
+        print("Error al descargar $filename: $e");
+      }
+    }).toList();
+
+    // Aquí esperará a que termine la descarga (ya sea una sola o varias a la vez)
+    await Future.wait(taskList);
+    print("Descarga finalizada.");
+  }
+
+  /**
    * Función encargada de borrado de fichero u directorio.
    */
   void deleteFile(String filename) async {
-
     // RUTA ACTUAL PARA BORRADO DE FICHEROS / DIRECTORIOS
-    String destinationPath = _currentPath.isEmpty ? _user : "$_user/$_currentPath";
+    String destinationPath = _currentPath.isEmpty
+        ? _user
+        : "$_user/$_currentPath";
 
     // Construimos la URL con el usuario y el nombre del archivo a borrar
     final url = '$baseUrl/delete?usuario=$destinationPath&filename=$filename';
@@ -444,7 +490,8 @@ class _FileListPageState extends State<FileListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar( // Si queremos volver atrás de donde sea que estemos a nivel de "árbol de directorios."
+      appBar: AppBar(
+        // Si queremos volver atrás de donde sea que estemos a nivel de "árbol de directorios."
         title: Text(
           _currentPath.isEmpty ? "Mis archivos" : _currentPath.split('/').last,
         ),
@@ -457,61 +504,84 @@ class _FileListPageState extends State<FileListPage> {
                     _currentPath = _navigationHistory.removeLast();
                   });
                   loadFiles(); // Recargamos la carpeta anterior (el lugar en el que estuvimos previamente, para
-                               // "VOLVER" al lugar anterior en el árbol de directorios.
+                  // "VOLVER" al lugar anterior en el árbol de directorios.
                 },
               )
             : null, // Si estamos en la raíz, saca el menú hamburguesa por defecto
       ), // Barra superior
-      // Botón con menú inferior derecho para varias opciones (Subir, crear directorio...)
-      floatingActionButton: PopupMenuButton<String>(
-        // Desplaza el menú hacia arriba para que no tape el botón
-        offset: const Offset(0, -110),
 
-        // El botón físico redondo que se verá en pantalla
-        child: Material(
-          elevation: 6, // Sombra
-          shape: const CircleBorder(),
-          color: Colors.blueAccent,
-          child: const SizedBox(
-            width: 56,
-            height: 56,
-            child: Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 28,
-            ), // Usamos el icono de añadir +
-          ),
-        ),
+      // BOTONES FLOTANTES
+      // ----------------- > Donde tendremos 2 casos posibles con respecto a qué botones mostrar (En base a si hay o no ficheros seleccionados):
+      floatingActionButton: selectedFiles.isEmpty
 
-        // Qué pasa cuando el usuario selecciona una opción
-        onSelected: (String value) {
-          if (value == 'upload') {
-            uploadFile(); // Llamada la función de subida de ficheros
-          } else if (value == 'folder') {
-            _dialogCreateFolder(); // Llamada a la función que crea directorios
-          }
-        },
+          // CASO A: No hay selección -> Vista de "PopupMenuButton" original (Subir/Crear)
+          ? PopupMenuButton<String>(
+              offset: const Offset(0, -110),
+              child: Material(
+                elevation: 6,
+                shape: const CircleBorder(),
+                color: Colors.blueAccent,
+                child: const SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Icon(Icons.add, color: Colors.white, size: 28),
+                ),
+              ),
+              onSelected: (String value) {
+                if (value == 'upload') {
+                  uploadFile();
+                } else if (value == 'folder') {
+                  _dialogCreateFolder();
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'upload',
+                  child: ListTile(
+                    leading: Icon(Icons.upload, color: Colors.blueAccent),
+                    title: Text('Subir archivo'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'folder',
+                  child: ListTile(
+                    leading: Icon(Icons.create_new_folder, color: Colors.green),
+                    title: Text('Crear carpeta'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            )
 
-        // Las opciones que se despliegan en el Pop-Up
-        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-          const PopupMenuItem<String>(
-            value: 'upload',
-            child: ListTile(
-              leading: Icon(Icons.upload, color: Colors.blueAccent),
-              title: Text('Subir archivo'),
-              contentPadding: EdgeInsets.zero,
+          // CASO B: Hay selección -> Botón directo de DESCARGA MASIVA ASÍNCRONA de varios ficheros
+          : FloatingActionButton(
+              backgroundColor: Colors.green,
+              onPressed: isDownloading
+                  ? null // Evita dobles clics accidentales
+                  : () async {
+                      setState(() => isDownloading = true);
+
+                      // Ejecuta la descarga paralela asíncrona hacia Spring Boot
+                      await downloadFiles(selectedFiles);
+
+                      setState(() {
+                        isDownloading = false;
+                        selectedFiles
+                            .clear(); // Limpia los checkboxes en la GUI al terminar
+                      });
+                    }, // Cambia a verde para denotar la descarga
+              child: isDownloading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.download, color: Colors.white),
             ),
-          ),
-          const PopupMenuItem<String>(
-            value: 'folder',
-            child: ListTile(
-              leading: Icon(Icons.create_new_folder, color: Colors.green),
-              title: Text('Crear carpeta'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
 
       // Menú desplegable "Hamburguesa".
       drawer: Drawer(
@@ -531,14 +601,22 @@ class _FileListPageState extends State<FileListPage> {
               decoration: const BoxDecoration(color: Colors.blueAccent),
               accountName: Text(
                 _user, // Variable de usuario, para determinar el nombre.
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               accountEmail: const Text("Usuario de VGCloud"),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: Colors.white,
                 child: Text(
-                  _user.isNotEmpty ? _user[0].toUpperCase() : "U", // Inicial del usuario en mayúscula
-                  style: const TextStyle(fontSize: 32, color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                  _user.isNotEmpty ? _user[0].toUpperCase() : "U",
+                  // Inicial del usuario en mayúscula
+                  style: const TextStyle(
+                    fontSize: 32,
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -641,10 +719,13 @@ class _FileListPageState extends State<FileListPage> {
                             // entonces estamos en nuestra ruta raíz de usuario aún, por lo que la ruta destino es esa misma.
                             // Por el contrario, si hay valor en _currentPath, es que estamos en otro lado, por lo que conviene
                             // especificar donde, construyendo la ruta de destino deseada (ruta actual + el archivo a visualizar).
-                            String rutaDestino = _currentPath.isEmpty ? _user : "$_user/$_currentPath";
+                            String rutaDestino = _currentPath.isEmpty
+                                ? _user
+                                : "$_user/$_currentPath";
 
                             // 2. Construimos la URL correcta con el parámetro de seguridad
-                            final urlParaVisor = "$baseUrl/$file?usuario=$rutaDestino";
+                            final urlParaVisor =
+                                "$baseUrl/$file?usuario=$rutaDestino";
 
                             // Por otro lado, si tiene extensión, es un archivo real. Abres tu visor:
                             Navigator.push(
@@ -667,10 +748,16 @@ class _FileListPageState extends State<FileListPage> {
                           ),
                           child: Row(
                             children: [
+                              // Para crear los checkboxes para cada fichero. Acordémonos que en el ListBuilder
+                              // le dimos el nombre "file" a la variable que representa a cada fichero individual.
+                              createFileCheckbox(file),
+
                               Icon(
                                 getIcon(file),
-                                  size: 32,
-                                  color: !file.contains('.') ? Colors.amber : Colors.blueGrey
+                                size: 32,
+                                color: !file.contains('.')
+                                    ? Colors.amber
+                                    : Colors.blueGrey,
                               ),
                               SizedBox(width: 12),
 
@@ -737,6 +824,27 @@ class _FileListPageState extends State<FileListPage> {
       ),
     );
   }
+
+  // Función auxiliar fuera de Scaffold para crear checkboxes en los archivos y permitir
+  // seleccionarlos.
+  Widget createFileCheckbox(String filename) {
+    final bool isSelected = selectedFiles.contains(filename);
+
+    return Checkbox(
+      value: isSelected,
+      onChanged: isDownloading
+          ? null // Deshabilitado si está descargando
+          : (bool? selectedValue) {
+              setState(() {
+                if (selectedValue == true) {
+                  selectedFiles.add(filename);
+                } else {
+                  selectedFiles.remove(filename);
+                }
+              });
+            },
+    );
+  }
 }
 
 /**
@@ -756,12 +864,7 @@ class ViewerPage extends StatelessWidget {
   // Pinta las interfaz requerida en función del tipo de archivo SELECCIONADO a visualizar.
   @override
   Widget build(BuildContext context) {
-    String extension = url
-        .split('?')
-        .first
-        .split('.')
-        .last
-        .toLowerCase();
+    String extension = url.split('?').first.split('.').last.toLowerCase();
 
     if (extension == "jpg" || extension == "png" || extension == "gif") {
       return Scaffold(
