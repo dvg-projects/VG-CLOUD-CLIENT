@@ -74,7 +74,9 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 - [x] Implementación de pantalla de Inicio de sesión y su lógica backend correspondiente.
 - [x] Implementación de persistencia al inicio de sesión con `SharedPreferences`
 - [ ] Implementación de mejoras en el registro de usuario, añadiendo criterios para las contraseñas (longitud, carácteres especiales...).
-- [ ] Implementación de descarga de ficheros (siguiente paso natural habiendo implementado ya la subida de ficheros).
+- [x] Implementación de descarga de ficheros (siguiente paso natural habiendo implementado ya la subida de ficheros).
+  - [x] Implementación de descarga de ficheros.
+  - [x] Compresión y descargar de ficheros ZIP para la descarga de varios archivos (tanto directorios como ficheros) de manera simultánea.
 - [ ] Mejoras significativas en las pantallas de visualizado de ficheros multimedia (actualmente existe una versión muy primitiva).
 - [ ] Implementación de sección informativa del estado del Cloud (memoria disponible, total, usada...).
 - [ ] Implementación de sección de perfil de usuario (con ajustes menores).
@@ -84,9 +86,13 @@ Aquí hago listado de las funcionalidades implementadas y las pendientes por imp
 
 ## :bug: :umbrella: Estado Actual y Bugs Conocidos :wrench: :construction_worker:
 
-Actualmente, el módulo de gestión de descargas se encuentra en desarrollo activo. Se han identificado las siguientes limitaciones temporales que están siendo subsanadas:
+Actualmente, el módulo de gestión de descargas se encuentra en desarrollo activo
+Actualmente se ha conseguido:
 
-* **Descarga Recursiva:** Fallo puntual en la resolución de rutas al descargar directorios completos que contienen subcarpetas anidadas.
-* **Rutas de Almacenamiento:** Comportamiento inconsistente en la asignación de rutas locales específicas bajo determinadas condiciones del sistema operativo.
+* **:white_check_mark:Descarga Recursiva:** Fallo puntual en la resolución de rutas al descargar directorios completos que contienen subcarpetas anidadas.
+
+Objetivos por cumplir con respeto a esta implementación:
+
+* **Selección de ruta de destino en Android/iOS:** Permitir, de alguna manera aún por explorar y valorar, guardar en una ubicación deseada en el almacenamiento en el caso de los dispositivos Android y iOS (Actualmente esto funciona en Windows). Por ahora se permite la descarga de los ficheros en caché segura del dispositivo, con la posibilidad de ser compartidos por otros medios, a aplicaciones de terceros.
 
 *Nota: La aplicación es completamente estable, compila sin errores y la descarga de archivos individuales funciona al 100%.*

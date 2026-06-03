@@ -3,6 +3,9 @@
     <!-- Permiso esencial para hablar con el servidor SpringBoot, permite tráfico en internet -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Añadimos también permisos para que Android pueda acceder a almacenamiento externo, de cara al guardado de ficheros. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
     <application
         android:label="file_app"
         android:name="${applicationName}"

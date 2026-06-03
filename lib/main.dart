@@ -1,14 +1,15 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart'; // Nuestro envoltorio que decide que arrancar, si el loggeo u esta "actividad".
 
 /**
@@ -174,7 +175,7 @@ class _FileListPageState extends State<FileListPage> {
       // FilePicker -> Abre el explorador de archivos.
       // withData: false -> Indica que no quieres cargar el contenido del archivo en la memoria RAM en ese instante.
       // await da lugar al usuario a que elija archivo.
-      final result = await FilePicker.platform.pickFiles(withData: false);
+      final result = await FilePicker.pickFiles(withData: false);
 
       // Si el usuario NO escoje archivo (pulsa cancelar o vuelve atrás) O existe cualquier problema con el archivo seleccionado
       // (por ejemplo, problema de permisos), en ambos casos, FRENA la petición POST para evitar mayores errores, pues o no se ha
@@ -271,38 +272,142 @@ class _FileListPageState extends State<FileListPage> {
   /**
    * Función encargada de DESCARGAR ARCHIVOS desde nuestro Cloud.
    */
-  Future<void> downloadFiles(List<String> filesList) async {
-    // Comprobamos que la lista de referencias de ficheros no venga vacía.
-    if (filesList.isEmpty) return;
+  Future<void> processDownload(BuildContext context, List<String> elementsList, String usuario) async {
+    if (elementsList.isEmpty) return;
 
-    // Inicializamos Dio y obtenemos la ruta destino del archivo u archivos a descargar (esto dependerá del sistema
-    // en el que nos encontremos).
     Dio dio = Dio();
-    var destinationDirectory =
-        await getDownloadsDirectory() ??
-        await getApplicationDocumentsDirectory();
 
-    print("Iniciando proceso para ${filesList.length} archivo(s)...");
+    // Determinamos el nombre por defecto del fichero según la selección
+    // En el caso en el que se trate únicamente de un archivo, "desmenuza" la ruta y se queda con el último nombre tras la "/",
+    // es decir, con el nombre que mostraremos como "sugerido" o "predeterminado" al usuario al abrir su explorador de archivos.
 
-    // Mapeamos la lista de archivos a una lista de tareas asíncronas
-    // Dicho de otra manera, dicho de otra manera, itera en la petición
-    // a la función de Springboot que descarga fichero, cuantos archivos haya y los divide en tareas asíncronas.
-    List<Future<void>> taskList = filesList.map((filename) async {
-      try {
-        final String urlIndividual = "$baseUrl/$filename?usuario=$_user";
-        String localSavePath = "${destinationDirectory.path}/$filename";
+    // Pero si esto no es así, y hay varios archivos (o has seleccionado un directorio), sugeriremos un fichero con terminación .zip
+    bool onlyOneFile = elementsList.length == 1 && elementsList.first.contains('.');
 
-        // Cada descarga se dispara de forma independiente
-        await dio.download(urlIndividual, localSavePath);
-        print("Descargado: $filename");
-      } catch (e) {
-        print("Error al descargar $filename: $e");
+    // Generamos una marca de tiempo única (Ej: 20260603_1750) para evitar que los ZIPs se sobrescriban en Android
+    String timestamp = DateTime.now().toString().replaceAll(RegExp(r'[-唱 :.]'), '').substring(0, 13);
+
+    String defaultFileName = onlyOneFile
+        ? elementsList.first.split('/').last
+        : "descarga_vgcloud_$timestamp.zip";
+
+    // Variable que determinará la ruta final a utilizar.
+    String savedFinalPath;
+
+    // ABRIMOS EL SELECTOR NATIVO DEL SISTEMA OPERATIVO
+    // Si se trata de Windows, al no tener restricciones en los permisos de escritura tan rigurosos como los de Android/iOS, procedemos normalmente.
+    if (Platform.isWindows) {
+      String? chosenPath = await FilePicker.saveFile(
+        dialogTitle: 'Selecciona ubicación de guardado',
+        fileName: defaultFileName, // El nombre sugerido determinado en el bloque más arriba, O BIEN el escrito por el usuario.
+        type: FileType.any, // Permite cualquier tipo de extensión (.jpg, .zip, etc.)
+      );
+      // Si no se escoje ninguna ruta, el programa "no hace nada" y devuelve el control al usuario.
+      if (chosenPath == null) return;
+
+      // De lo contrario, sobrescribimos la variable con la ruta escogida.
+      savedFinalPath = chosenPath;
+
+    } else {
+      // De lo contrario, (es decir, si es Android o iOS), obtenemos un "directorio seguro", donde no haya problemas
+      // de permisos.
+      Directory safeDir = await getApplicationDocumentsDirectory();
+      savedFinalPath = "${safeDir.path}/$defaultFileName";
+    }
+
+
+    // En cualquiera de los dos casos anterior, YA CONTAMOS CON RUTA DE DESTINO.
+    try {
+      // Si sólo fue un fichero seleccionado, lo tomamos y damos orden a Dio de que lo descargue en la ruta indicada por el usuario
+      // (o en la ruta segura).
+      if (onlyOneFile) {
+        String completePath = elementsList.first;
+
+        // Limpiamos los fragmentos de subcarpetas si los hubiera para el endpoint GET
+        String fileCleanName = completePath.split('/').last;
+        String subDir = completePath.contains('/') ? completePath.substring(0, completePath.lastIndexOf('/')) : "";
+        String userBackendDestination = subDir.isEmpty ? usuario : "$usuario/$subDir";
+
+        // Montamos la URL y realizamos la petición GET limpia.
+        final String url = "$baseUrl/$fileCleanName?usuario=$userBackendDestination";
+        await dio.download(url, savedFinalPath);
+
+        // Nombre final para el fichero (si el usuario lo cambió), para reflejarlo en el feedback
+        String finalFileName = savedFinalPath.split(Platform.pathSeparator).last;
+
+        // En Windows guardamos directo, en Android ofrecemos la opción de exportar/guardar fuera
+        if (Platform.isWindows) {
+          _showScreenNotification(context, "Archivo '$finalFileName' guardado correctamente.");
+        } else {
+          _showScreenActionNotification(context, "Archivo descargado en caché segura.", savedFinalPath);
+        }
+
+        // Y si se trató de una descarga conjunta de ficheros, mandamos la URL indicando que tenemos la intención de crear un fichero ZIP
+        // (Consultar código SpringBoot para saber como funciona esta parte).
+      } else {
+
+        // Transformamos la lista en texto formato "csv", por así decirlo.
+        String elementsQuery = elementsList.join(',');
+
+        // Construimos la URL con los dos parámetros requeridos.
+        final String urlZip = "$baseUrl/descargar-zip?usuario=$usuario&elementos=$elementsQuery";
+
+        print("Disparando descarga masiva GET hacia: $urlZip");
+
+        // Realizamos la petición GET limpia.
+        await dio.download(urlZip, savedFinalPath);
+
+        // Nombre final para el fichero (si el usuario lo cambió), para reflejarlo en el feedback
+        String finalZipName = savedFinalPath.split(Platform.pathSeparator).last;
+
+        // En Windows guardamos directo, en Android ofrecemos la opción de exportar/guardar fuera
+        if (Platform.isWindows) {
+          _showScreenNotification(context, "Archivo '$finalZipName' guardado correctamente.");
+        } else {
+          _showScreenActionNotification(context, "Archivo descargado en caché segura.", savedFinalPath);
+        }
       }
-    }).toList();
+    } catch (e) {
+      print("Error en el flujo de descarga: $e");
+      _showScreenNotification(context, "Error crítico al intentar guardar el archivo.");
+    }
+  }
 
-    // Aquí esperará a que termine la descarga (ya sea una sola o varias a la vez)
-    await Future.wait(taskList);
-    print("Descarga finalizada.");
+  // Y como Dart, a diferencia de Java y otros lenguajes, no permite la sobrecarga de funciones, implementamos dos funciones
+  // para los dos posibles resultados.
+
+  // Notificación con botón de acción para ir a la ubicación del fichero guardado.
+  void _showScreenActionNotification(BuildContext context, String message, String filePath) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+        backgroundColor: Colors.blueGrey,
+        duration: const Duration(seconds: 8), // Damos margen para que el usuario pulse
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'COMPARTIR', // Al pulsar aquí, Android le dejará mover el archivo a donde quiera
+          textColor: Colors.lightBlueAccent,
+          onPressed: () async {
+            // Despliega el menú del sistema operativo con las opciones para guardar en carpetas, enviar por WhatsApp, etc.
+            await Share.shareXFiles(
+                [XFile(filePath)],
+                text: 'Descarga realizada desde VG-CLOUD'
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // Notificación en pantalla genérica y auxiliar.
+  void _showScreenNotification(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.blueGrey,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   /**
@@ -558,19 +663,18 @@ class _FileListPageState extends State<FileListPage> {
           : FloatingActionButton(
               backgroundColor: Colors.green,
               onPressed: isDownloading
-                  ? null // Evita dobles clics accidentales
+                  ? null
                   : () async {
-                      setState(() => isDownloading = true);
+                setState(() => isDownloading = true);
 
-                      // Ejecuta la descarga paralela asíncrona hacia Spring Boot
-                      await downloadFiles(selectedFiles);
+                // Pasamos el contexto de la GUI, la lista global de paths y el usuario raíz
+                await processDownload(context, selectedFiles, _user);
 
-                      setState(() {
-                        isDownloading = false;
-                        selectedFiles
-                            .clear(); // Limpia los checkboxes en la GUI al terminar
-                      });
-                    }, // Cambia a verde para denotar la descarga
+                setState(() {
+                  isDownloading = false;
+                  selectedFiles.clear(); // Limpiamos los checkboxes automáticamente
+                });
+              },
               child: isDownloading
                   ? const SizedBox(
                       width: 24,
